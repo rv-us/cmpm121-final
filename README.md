@@ -28,7 +28,7 @@ For code editing, we will use **Visual Studio Code** ([VS Code](https://code.vis
 
 ### Generative AI
 
-Our team plans to use generative AI tools selectively and transparently. We will allow the use of autocomplete features in tools like **GitHub Copilot** for code suggestions, but we will establish clear guidelines about when and how AI-generated code should be reviewed and understood by team members before integration. We will not use agentic AI modes that make direct modifications to our codebase without human review. Any significant AI assistance will be documented in our development process. The goal is to use AI as a productivity tool while ensuring all team members understand and can maintain the codebase.
+Our team plans to use generative AI tools, including agentic modes, to assist with development. **Anish Bansal** will use **GitHub Copilot** for AI-assisted coding, while **Rachit Verma** will use **Cursor** with its AI features. We will allow the use of both autocomplete features and agentic AI modes that can make direct modifications to our codebase. However, we will establish clear guidelines about when and how AI-generated code should be reviewed and understood by team members before integration. Any significant AI assistance will be documented in our development process. The goal is to use AI as a productivity tool while ensuring all team members understand and can maintain the codebase.
 
 ## Outlook
 
