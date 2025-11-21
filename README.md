@@ -130,7 +130,7 @@ Implemented a physics-based puzzle game where players control a red ball to reac
 - Switched to keyboard controls for better usability and responsiveness
 - Removed joystick code to keep codebase clean
 
-### Current State
+### Reflection of current state
 
 The game is now fully playable with:
 - ✅ Physics-based puzzle with ball rolling mechanics
@@ -141,11 +141,18 @@ The game is now fully playable with:
 - ✅ Pre-commit automation working
 - ✅ GitHub Actions CI/CD pipeline configured
 
-### Next Steps
+
+- so far we are looking good and on track
+
+### Reflection of Next Steps
 
 - Test the GitHub Actions workflow on next push
 - Refine wall positioning and puzzle difficulty
 - Consider adding more visual polish (textures, better materials)
 - Plan for LLM integration in future iterations
 - Add more puzzle variations or levels
+
+
+### November 21 update 
+- Ball physics refined
 
