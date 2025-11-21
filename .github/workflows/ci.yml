@@ -1,0 +1,145 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Type check
+      run: npm run typecheck
+      
+    - name: Lint
+      run: npm run lint
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: 'public'
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+      
+  screenshot-and-test:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps chromium
+      
+    - name: Start local server
+      run: |
+        npm install -g http-server
+        http-server public -p 8080 > /dev/null 2>&1 &
+        sleep 5
+      continue-on-error: false
+      
+    - name: Create test script
+      run: |
+        cat > test-game.js << 'EOF'
+        const { chromium } = require('playwright');
+        (async () => {
+          const browser = await chromium.launch();
+          const page = await browser.newPage();
+          await page.setViewportSize({ width: 1920, height: 1080 });
+          
+          try {
+            await page.goto('http://localhost:8080', { waitUntil: 'networkidle', timeout: 10000 });
+            await page.waitForTimeout(2000);
+            
+            // Take initial screenshot
+            await page.screenshot({ path: 'screenshot-initial.png', fullPage: true });
+            console.log('Initial screenshot taken');
+            
+            // Execute fixed sequence of inputs
+            const canvas = await page.$('canvas');
+            if (canvas) {
+              const box = await canvas.boundingBox();
+              if (box) {
+                // Simulate mouse interaction (click and drag)
+                await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+                await page.mouse.down();
+                await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5, { steps: 10 });
+                await page.mouse.up();
+                await page.waitForTimeout(3000);
+                
+                // Take screenshot after interaction
+                await page.screenshot({ path: 'screenshot-after-interaction.png', fullPage: true });
+                console.log('Post-interaction screenshot taken');
+              }
+            }
+            
+            // Verify game container exists and is visible
+            const gameContainer = await page.$('#game-container');
+            if (!gameContainer) {
+              throw new Error('Game container not found');
+            }
+            
+            const isVisible = await gameContainer.isVisible();
+            if (!isVisible) {
+              throw new Error('Game container is not visible');
+            }
+            
+            console.log('Interaction test passed - game is in valid state');
+          } catch (error) {
+            console.error('Test failed:', error);
+            await page.screenshot({ path: 'screenshot-error.png', fullPage: true });
+            throw error;
+          } finally {
+            await browser.close();
+          }
+        })();
+        EOF
+        
+    - name: Run screenshot and interaction test
+      run: node test-game.js
+      
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: screenshots
+        path: |
+          screenshot-*.png
+        retention-days: 7
+

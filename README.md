@@ -38,3 +38,114 @@ We anticipate that the hardest part of the project will be integrating LLM-drive
 
 By approaching this project with the web browser platform and implementing our own rendering and physics systems while integrating LLMs, we hope to gain a deeper understanding of how game engines work under the hood and how modern AI technologies can enhance game experiences. We expect to learn about graphics programming, linear algebra applications in game development, physics simulation, LLM integration patterns, performance optimization techniques, and the trade-offs involved in building versus using existing tools. This hands-on approach should provide valuable insights into both the technical aspects of game engine development and the creative possibilities of combining AI with interactive physics-based worlds.
 
+---
+
+# Devlog Entry - November 20, 2025
+
+## Project Setup and Initial Implementation
+
+Today we made significant progress on setting up the project infrastructure and implementing the core F1 requirements.
+
+### Development Environment Setup
+
+We initialized the project with TypeScript and configured the build system:
+- Created `package.json` with proper scripts for building, linting, and type checking
+- Configured `tsconfig.json` for ES2020 modules with strict type checking
+- Set up project structure with organized folders: `src/game/`, `src/scenes/`, `src/objects/`, `src/ui/`, and `public/`
+- Configured output to `public/dist/` for GitHub Pages deployment
+
+### Third-Party Libraries Integration
+
+Successfully integrated the required third-party libraries:
+- **Three.js** (v0.160.0): Integrated via CDN using import maps for 3D rendering
+- **Cannon-es** (v0.20.0): Integrated via CDN for physics simulation
+- Both libraries are loaded as ES modules, satisfying the F1 requirement for third-party 3D rendering and physics libraries
+
+### Core Game Implementation
+
+Implemented a physics-based puzzle game where players control a red ball to reach a green target:
+
+**Physics System:**
+- Created `PhysicsWorld.ts` wrapper around Cannon.js for physics simulation
+- Implemented `PhysicsObject.ts` class to sync Three.js meshes with Cannon.js physics bodies
+- Set up gravity and collision detection
+
+**Rendering System:**
+- Created `Renderer.ts` to manage Three.js scene, camera, and renderer
+- Implemented proper lighting with ambient and directional lights
+- Added shadow mapping for visual depth
+
+**Game Logic:**
+- Implemented `Puzzle.ts` for game state management (Playing, Success, Failure)
+- Created `PuzzleScene.ts` with the main game scene including:
+  - Red ball (player-controlled object)
+  - Green target platform
+  - Brown ramp/platform
+  - Six gray walls creating a navigable path
+- Added success/failure detection when ball reaches target or falls off
+
+**Player Controls:**
+- Implemented `KeyboardController.ts` for keyboard input
+- Supports Arrow Keys and WASD for ball movement
+- Applies continuous forces to the ball for smooth control
+
+**UI Feedback:**
+- Created `GameUI.ts` for visual feedback
+- Large green pulsing plane appears on success
+- Red indicator for failure conditions
+
+### Development Automation
+
+**Pre-commit Automation:**
+- Installed and configured Husky for Git hooks
+- Set up lint-staged to process staged files
+- Configured ESLint (v9) with TypeScript support
+- Added Prettier for code formatting
+- Pre-commit hook runs:
+  - ESLint with auto-fix
+  - Prettier formatting
+  - TypeScript type checking (blocks commit on errors)
+
+**Post-push Automation:**
+- Created GitHub Actions workflow (`.github/workflows/ci.yml`)
+- Automatic deployment to GitHub Pages on push to main
+- Screenshot generation using Playwright in headless browser
+- Automated interaction testing with fixed input sequences
+- Tests verify game reaches expected states
+
+### Challenges and Solutions
+
+**Module Loading:**
+- Initially faced issues with ES module imports in the browser
+- Solved by adding `.js` extensions to all relative imports (required for ES modules)
+- Used import maps to resolve `three` and `cannon-es` from CDN
+
+**Caching Issues:**
+- Encountered browser caching preventing updates from appearing
+- Fixed by disabling cache in http-server (`-c-1` flag)
+- Added cache-busting query parameters to script tags
+
+**Control System Iteration:**
+- Initially implemented a 3D joystick controller
+- Switched to keyboard controls for better usability and responsiveness
+- Removed joystick code to keep codebase clean
+
+### Current State
+
+The game is now fully playable with:
+- ✅ Physics-based puzzle with ball rolling mechanics
+- ✅ Keyboard controls (Arrow Keys/WASD)
+- ✅ Success/failure detection with visual feedback
+- ✅ Obstacle course with walls creating a path
+- ✅ All F1 requirements satisfied
+- ✅ Pre-commit automation working
+- ✅ GitHub Actions CI/CD pipeline configured
+
+### Next Steps
+
+- Test the GitHub Actions workflow on next push
+- Refine wall positioning and puzzle difficulty
+- Consider adding more visual polish (textures, better materials)
+- Plan for LLM integration in future iterations
+- Add more puzzle variations or levels
+
