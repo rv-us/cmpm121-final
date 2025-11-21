@@ -4,7 +4,7 @@ import { PhysicsObject } from './PhysicsObject.js';
 export class KeyboardController {
   private ball: PhysicsObject | null = null;
   private keys: Set<string> = new Set();
-  private forceStrength: number = 20;
+  private forceStrength: number = 2;
 
   constructor() {
     this.setupEventListeners();
