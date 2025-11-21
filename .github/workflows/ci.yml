@@ -85,8 +85,8 @@ jobs:
       
     - name: Create test script
       run: |
-        cat > test-game.js << 'EOF'
-        const { chromium } = require('playwright');
+        cat > test-game.mjs << 'EOF'
+        import { chromium } from 'playwright';
         (async () => {
           const browser = await chromium.launch();
           const page = await browser.newPage();
@@ -100,23 +100,17 @@ jobs:
             await page.screenshot({ path: 'screenshot-initial.png', fullPage: true });
             console.log('Initial screenshot taken');
             
-            // Execute fixed sequence of inputs
-            const canvas = await page.$('canvas');
-            if (canvas) {
-              const box = await canvas.boundingBox();
-              if (box) {
-                // Simulate mouse interaction (click and drag)
-                await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
-                await page.mouse.down();
-                await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5, { steps: 10 });
-                await page.mouse.up();
-                await page.waitForTimeout(3000);
-                
-                // Take screenshot after interaction
-                await page.screenshot({ path: 'screenshot-after-interaction.png', fullPage: true });
-                console.log('Post-interaction screenshot taken');
-              }
-            }
+            // Execute fixed sequence of inputs - simulate keyboard controls
+            await page.keyboard.press('ArrowRight');
+            await page.waitForTimeout(500);
+            await page.keyboard.press('ArrowRight');
+            await page.waitForTimeout(500);
+            await page.keyboard.press('ArrowUp');
+            await page.waitForTimeout(1000);
+            
+            // Take screenshot after interaction
+            await page.screenshot({ path: 'screenshot-after-interaction.png', fullPage: true });
+            console.log('Post-interaction screenshot taken');
             
             // Verify game container exists and is visible
             const gameContainer = await page.$('#game-container');
@@ -141,7 +135,7 @@ jobs:
         EOF
         
     - name: Run screenshot and interaction test
-      run: node test-game.js
+      run: node test-game.mjs
       
     - name: Upload screenshots
       uses: actions/upload-artifact@v4
