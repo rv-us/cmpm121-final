@@ -156,3 +156,146 @@ The game is now fully playable with:
 ### November 21 update 
 - Ball physics refined
 
+---
+
+# Devlog Entry - November 30, 2025
+
+## Physics Refinements and Timer System Implementation
+
+Today we focused on improving the physics simulation, refining the game environment, implementing a timer system, and fixing automation issues.
+
+### Physics Material System
+
+Implemented a comprehensive physics material system to fix collision issues:
+
+**Created Physics Materials:**
+- **Ball Material**: Low friction (0.3), moderate bounce (0.3 restitution)
+- **Wall Material**: High friction (0.8), minimal bounce (0.1 restitution)
+- **Ground/Target Material**: Medium friction (0.5-0.6), no bounce (0.0 restitution)
+
+**Contact Materials:**
+- Configured specific interaction properties between different material pairs
+- Ball vs Wall: Balanced friction and bounce for realistic collisions
+- Ball vs Ground: Higher friction for better control
+- Ball vs Target: Low bounce for stable landing detection
+
+**Damping:**
+- Added linear and angular damping (0.4) to all physics objects
+- Reduces unwanted bouncing and jittery motion
+- Creates more stable and predictable physics behavior
+
+### Timer System and Scene Management
+
+Implemented a 10-second timer system with automatic scene restart and exit:
+
+**Timer Features:**
+- **10-Second Countdown**: Timer starts when puzzle scene loads
+- **Visual Timer Display**: Yellow progress bar at top of screen (turns red when < 3 seconds remaining)
+- **Auto-Restart on Timeout**: If target not reached in 10 seconds, scene automatically restarts after showing failure message
+- **Scene Exit on Success**: When puzzle is completed, scene exits after 2-second success display
+
+**Scene Management:**
+- Timer resets to 10 seconds when scene enters
+- Ball position and physics state reset on scene restart
+- Clean separation between scene lifecycle and game logic
+- Foundation for F2 multi-scene requirements
+
+### Platform Perimeter Protection
+
+Calculated platform dimensions and added complete perimeter walls:
+- **Platform**: 20×20 units (400 square units area)
+- **Perimeter**: Walls positioned at edges (9.85 units from center) to prevent ball from falling off
+- **Gap Management**: Added 4 small walls to cover gaps in north/south walls while maintaining a 2-unit path for gameplay
+
+### Camera Improvements
+
+Adjusted camera for better gameplay visibility:
+- **Position**: Moved from (0, 5, 10) to (0, 15, 18) - further back and higher
+- **Angle**: More top-down view while maintaining angled perspective
+- **FOV**: Reduced from 75° to 60° for better focus on gameplay area
+
+### Ramp Redesign
+
+Reversed and repositioned the ramp for better gameplay flow:
+- **Angle**: Changed from -0.2 to +0.3 radians (tilted upward toward target)
+- **Position**: Lowered from Y=1.0 to Y=0.3 (sunk into floor)
+- **Purpose**: Ball now rolls up the ramp and falls onto the target platform
+
+### Development Workflow Improvements
+
+**Removed Pre-commit Hooks:**
+- Removed Husky and lint-staged due to PATH issues on Windows
+- Switched to GitHub Actions-only approach for automation
+- All checks now run in CI pipeline (more reliable across environments)
+
+**GitHub Actions Fixes:**
+- Added required permissions (`id-token: write`, `pages: write`) for GitHub Pages deployment
+- Fixed test script to use ES modules (changed from `.js` to `.mjs`)
+- Updated test to use keyboard inputs instead of mouse interactions
+- Screenshots saved as artifacts for 7 days
+
+### Code Quality
+
+- Improved TypeScript type safety (removed `any` types)
+- Better separation of concerns in physics and rendering systems
+- Cleaner codebase after removing unused joystick controller
+- Added timer state management and UI integration
+
+### Current State
+
+The game now features:
+- ✅ Realistic physics with proper material interactions
+- ✅ Complete perimeter protection (ball can't fall off platform)
+- ✅ Improved camera view for better gameplay visibility
+- ✅ Refined ramp mechanics for better puzzle flow
+- ✅ 10-second timer with automatic restart and scene exit
+- ✅ Visual timer display with color-coded urgency feedback
+- ✅ Reliable CI/CD pipeline with automated testing
+- ✅ All F1 requirements fully satisfied
+- ✅ **2D top-down RoomScene with 9 interconnected rooms**
+- ✅ **A* pathfinding system for intelligent navigation**
+- ✅ **Enhanced player character model with body and head**
+- ✅ **Seamless scene transitions between 2D room view and 3D puzzle view**
+- ✅ **Context-aware UI (instructions hidden in room scene)**
+- ✅ **Corridor system connecting rooms with doorways**
+- ✅ **Player spawns in non-puzzle room, requiring navigation to puzzle**
+
+### F2 Requirements Implementation - Room Scene and Navigation
+
+In preparation for F2 requirements, we've implemented a comprehensive 2D top-down adventure scene system:
+
+**Room Scene Architecture:**
+- **9-Room Grid Layout**: Created a 3×3 grid of interconnected rooms with proper floor, wall, and corridor systems
+- **Visual Room Design**: Each room features distinct flooring (gray for normal rooms, light green for puzzle room), walls with doorways, and connecting corridors
+- **Puzzle Room Integration**: Center room (Room 5) contains a red glowing puzzle indicator that transitions to the 3D physics puzzle scene
+
+**Pathfinding System:**
+- **A* Pathfinding Algorithm**: Implemented a grid-based A* pathfinding system for intelligent navigation
+- **Grid-Based Movement**: Player movement respects walls and navigates through doorways and corridors automatically
+- **Smooth Path Following**: Player character smoothly follows calculated paths to clicked destinations
+
+**Player Character Improvements:**
+- **Enhanced Character Model**: Replaced simple cylinder with a more detailed character model featuring:
+  - Cylindrical body (blue)
+  - Spherical head (skin-toned)
+  - Proper positioning and rotation
+- **Spawn Point**: Player now spawns in Room 1 (top-left) instead of the puzzle room, requiring navigation to reach the puzzle
+
+**Scene Management Enhancements:**
+- **Seamless Scene Transitions**: Clicking the puzzle indicator in Room 5 transitions to the 3D PuzzleScene
+- **Automatic Return**: Completing the puzzle automatically returns the player to the RoomScene
+- **UI Context Awareness**: Physics puzzle instructions are hidden in RoomScene and only appear when entering PuzzleScene
+- **Camera System**: Proper camera switching between orthographic (2D room view) and perspective (3D puzzle view)
+
+**Visual Polish:**
+- **Corridor System**: Added visible corridors connecting adjacent rooms with distinct flooring
+- **Wall Doorways**: Walls feature doorways for realistic room connections
+- **Improved Lighting**: Enhanced ambient and directional lighting for better room visibility
+
+### Next Steps
+
+- Implement object interaction system for F2 requirements
+- Add inventory system for carrying objects between scenes
+- Create additional interactive objects in rooms
+- Implement game ending conditions
+

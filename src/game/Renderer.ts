@@ -36,8 +36,9 @@ export class Renderer {
     window.addEventListener('resize', () => this.onWindowResize());
   }
 
-  public render(): void {
-    this.renderer.render(this.scene, this.camera);
+  public render(customCamera?: THREE.Camera): void {
+    const cameraToUse = customCamera || this.camera;
+    this.renderer.render(this.scene, cameraToUse);
   }
 
   private onWindowResize(): void {

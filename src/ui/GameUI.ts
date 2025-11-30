@@ -4,6 +4,7 @@ import { PuzzleState } from '../game/Puzzle.js';
 export class GameUI {
   private successText: THREE.Mesh | null = null;
   private failureText: THREE.Mesh | null = null;
+  private timerText: THREE.Mesh | null = null;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera | null = null;
 
@@ -105,6 +106,41 @@ export class GameUI {
       this.showSuccess();
     } else if (state === PuzzleState.Failure) {
       this.showFailure();
+    }
+  }
+
+  public updateTimer(remaining: number): void {
+    // Remove old timer
+    if (this.timerText) {
+      this.scene.remove(this.timerText);
+      this.timerText = null;
+    }
+
+    // Only show timer if puzzle is still active
+    if (remaining > 0) {
+      // Create timer display - simple plane with visual representation
+      const timerWidth = (remaining / 10) * 4; // Scale based on remaining time
+      const geometry = new THREE.PlaneGeometry(timerWidth, 0.3);
+      const material = new THREE.MeshBasicMaterial({ 
+        color: remaining < 3 ? 0xff0000 : 0xffff00, // Red if < 3 seconds, yellow otherwise
+        transparent: true, 
+        opacity: 0.8 
+      });
+      this.timerText = new THREE.Mesh(geometry, material);
+      
+      // Position timer at top of screen
+      if (this.camera) {
+        const cameraDirection = new THREE.Vector3();
+        this.camera.getWorldDirection(cameraDirection);
+        this.timerText.position.copy(this.camera.position);
+        this.timerText.position.add(cameraDirection.multiplyScalar(7));
+        this.timerText.position.y += 3;
+        this.timerText.lookAt(this.camera.position);
+      } else {
+        this.timerText.position.set(0, 6, -7);
+      }
+      
+      this.scene.add(this.timerText);
     }
   }
 }

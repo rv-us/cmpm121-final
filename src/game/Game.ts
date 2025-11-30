@@ -1,12 +1,14 @@
 import { Renderer } from './Renderer.js';
 import { PhysicsWorld } from './PhysicsWorld.js';
 import { PuzzleScene } from '../scenes/PuzzleScene.js';
+import { RoomScene } from '../scenes/RoomScene.js';
 import { KeyboardController } from '../objects/KeyboardController.js';
+import { SceneManager } from './SceneManager.js';
 
 export class Game {
   private renderer: Renderer;
   private physicsWorld: PhysicsWorld;
-  private scene: PuzzleScene;
+  private sceneManager: SceneManager;
   private keyboardController: KeyboardController;
   private animationId: number | null = null;
   private lastTime: number = 0;
@@ -14,14 +16,40 @@ export class Game {
   constructor(container: HTMLElement) {
     this.renderer = new Renderer(container);
     this.physicsWorld = new PhysicsWorld();
-    this.scene = new PuzzleScene(
+    this.sceneManager = new SceneManager();
+    this.keyboardController = new KeyboardController();
+    
+    // Create and register the room scene (2D top-down adventure)
+    const roomScene = new RoomScene(
+      this.renderer.scene,
+      this.renderer.camera,
+      this.renderer.renderer
+    );
+    roomScene.setSceneManager(this.sceneManager);
+    roomScene.setOnSceneExit((targetScene: string) => {
+      console.log(`Room scene exiting to: ${targetScene}`);
+      this.sceneManager.switchToScene(targetScene);
+    });
+    this.sceneManager.registerScene(roomScene);
+    
+    // Create and register the puzzle scene
+    const puzzleScene = new PuzzleScene(
       this.physicsWorld,
       this.renderer.renderer,
       this.renderer.scene,
       this.renderer.camera
     );
-    this.keyboardController = new KeyboardController();
-    this.scene.setKeyboardController(this.keyboardController);
+    puzzleScene.setSceneManager(this.sceneManager);
+    puzzleScene.setKeyboardController(this.keyboardController);
+    // Set callback for when puzzle is completed (returns to room scene)
+    puzzleScene.setOnSceneExit(() => {
+      console.log('Puzzle completed - returning to room scene');
+      this.sceneManager.switchToScene('room');
+    });
+    this.sceneManager.registerScene(puzzleScene);
+    
+    // Start with the room scene
+    this.sceneManager.switchToScene('room');
   }
 
   public start(): void {
@@ -36,12 +64,17 @@ export class Game {
     const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
     this.lastTime = currentTime;
 
-    // Update game logic
-    this.scene.update(deltaTime);
+    // Update current scene
+    this.sceneManager.update(deltaTime);
 
-    // Render
-    this.renderer.render();
+    // Render with current scene's camera (if set) or default camera
+    const sceneCamera = this.sceneManager.getCurrentCamera();
+    this.renderer.render(sceneCamera || undefined);
   };
+
+  public switchScene(sceneName: string): void {
+    this.sceneManager.switchToScene(sceneName);
+  }
 
   public stop(): void {
     if (this.animationId !== null) {
