@@ -9,7 +9,8 @@ export class PhysicsObject {
     geometry: THREE.BufferGeometry,
     material: THREE.Material,
     physicsShape: CANNON.Shape,
-    mass: number = 1
+    mass: number = 1,
+    physicsMaterial?: CANNON.Material
   ) {
     // Three.js mesh
     this.mesh = new THREE.Mesh(geometry, material);
@@ -17,8 +18,12 @@ export class PhysicsObject {
     this.mesh.receiveShadow = true;
 
     // Cannon.js body
-    this.body = new CANNON.Body({ mass });
+    this.body = new CANNON.Body({ mass, material: physicsMaterial });
     this.body.addShape(physicsShape);
+    
+    // Add linear and angular damping to reduce weird bouncing
+    this.body.linearDamping = 0.4; // Air resistance
+    this.body.angularDamping = 0.4; // Rotational resistance
     
     // Sync initial positions
     this.syncMeshToBody();

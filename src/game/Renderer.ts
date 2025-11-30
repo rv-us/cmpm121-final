@@ -13,14 +13,16 @@ export class Renderer {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
 
-    // Camera
+    // Camera - positioned further back with more top-down angle
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      60, // Slightly narrower FOV for better view
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    this.camera.position.set(0, 5, 10);
+    // Position: higher up (Y), further back (Z), centered (X)
+    // This creates a top-down angled view
+    this.camera.position.set(0, 15, 18);
     this.camera.lookAt(0, 0, 0);
 
     // Renderer
