@@ -8,6 +8,7 @@ import { GameUI } from '../ui/GameUI.js';
 import { Scene } from '../game/Scene.js';
 import { SceneManager } from '../game/SceneManager.js';
 import { Inventory } from '../systems/Inventory.js';
+import { GameStateManager } from '../systems/GameStateManager.js';
 
 
 
@@ -28,21 +29,29 @@ export class PuzzleScene implements Scene {
   private puzzleLights: THREE.Light[] = [];
   private groundMesh: THREE.Mesh | null = null;
   private inventory: Inventory;
+  private gameStateManager: GameStateManager;
   
   // Timer system
   private timerElapsed: number = 0;
   private timerMax: number = 10; // 10 seconds
   private onSceneExitCallback?: () => void;
 
-  constructor(physicsWorld: PhysicsWorld, renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, inventory: Inventory) {
+  constructor(
+    physicsWorld: PhysicsWorld, 
+    renderer: THREE.WebGLRenderer, 
+    scene: THREE.Scene, 
+    camera: THREE.PerspectiveCamera, 
+    inventory: Inventory,
+    gameStateManager: GameStateManager
+  ) {
     this.physicsWorld = physicsWorld;
     this.renderer = renderer;
     this.camera = camera;
     this.scene = scene;
-    this.inventory = inventory; // Store the inventory reference
+    this.inventory = inventory;
+    this.gameStateManager = gameStateManager;
     this.puzzle = new Puzzle();
     this.gameUI = new GameUI(scene, camera);
-    this.inventory = inventory;
     // Hide UI initially
     this.gameUI.hideAll();
   
@@ -283,6 +292,10 @@ export class PuzzleScene implements Scene {
   private setupPuzzleCallbacks(): void {
     this.puzzle.onSuccess(() => {
       this.gameUI.updateState(PuzzleState.Success);
+
+      // Mark puzzle as completed in game state
+      this.gameStateManager.completePuzzle();
+
       // Exit scene after a brief delay to show success message
       setTimeout(() => {
         if (this.onSceneExitCallback) {
@@ -293,6 +306,7 @@ export class PuzzleScene implements Scene {
 
     this.puzzle.onFailure(() => {
       this.gameUI.updateState(PuzzleState.Failure);
+      this.gameStateManager.recordPuzzleFailure();
     });
   }
 

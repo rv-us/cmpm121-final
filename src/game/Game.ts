@@ -6,6 +6,9 @@ import { KeyboardController } from '../objects/KeyboardController.js';
 import { SceneManager } from './SceneManager.js';
 import { Inventory } from '../systems/Inventory.js';
 import { InventoryUI } from '../ui/InventoryUI.js';
+import { GameStateManager, GameState } from '../systems/GameStateManager.js';
+import { EndingUI } from '../ui/EndingUI.js';
+import { ProgressHUD } from '../ui/ProgressHUD.js';
 
 export class Game {
   private renderer: Renderer;
@@ -14,6 +17,9 @@ export class Game {
   private keyboardController: KeyboardController;
   private inventory: Inventory;
   private inventoryUI: InventoryUI;
+  private gameStateManager: GameStateManager;
+  private endingUI: EndingUI;
+  private progressHUD: ProgressHUD;
   private animationId: number | null = null;
   private lastTime: number = 0;
 
@@ -26,6 +32,31 @@ export class Game {
     // Create inventory system
     this.inventory = new Inventory();
     this.inventoryUI = new InventoryUI(this.inventory);
+    
+    // Create game state and ending systems
+    this.gameStateManager = new GameStateManager();
+    this.endingUI = new EndingUI();
+    this.progressHUD = new ProgressHUD(this.gameStateManager);
+    
+    // Listen for inventory changes to update game state
+    this.inventory.onChange(() => {
+      const itemCount = this.inventory.getItemCount();
+      this.gameStateManager.setItemsCollected(itemCount);
+      this.progressHUD.refresh(); // Update HUD when inventory changes
+    });
+    
+    // Listen for game state changes to show ending screens
+    this.gameStateManager.onStateChange((state: GameState) => {
+      this.progressHUD.refresh(); // Update HUD when state changes
+      
+      if (state === GameState.VICTORY) {
+        this.endingUI.showVictory();
+        this.stop();
+      } else if (state === GameState.GAME_OVER) {
+        this.endingUI.showGameOver();
+        this.stop();
+      }
+    });
     
     // Create and register the room scene (2D top-down adventure)
     const roomScene = new RoomScene(
@@ -47,7 +78,8 @@ export class Game {
       this.renderer.renderer,
       this.renderer.scene,
       this.renderer.camera,
-      this.inventory // Pass inventory to puzzle scene
+      this.inventory, // Pass inventory to puzzle scene
+      this.gameStateManager // Pass game state manager
     );
     puzzleScene.setSceneManager(this.sceneManager);
     puzzleScene.setKeyboardController(this.keyboardController);
