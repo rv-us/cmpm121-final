@@ -1,4 +1,3 @@
-import { SceneManager } from '../game/SceneManager.js';
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PhysicsWorld } from '../game/PhysicsWorld.js';
@@ -7,6 +6,7 @@ import { KeyboardController } from '../objects/KeyboardController.js';
 import { Puzzle, PuzzleState } from '../game/Puzzle.js';
 import { GameUI } from '../ui/GameUI.js';
 import { Scene } from '../game/Scene.js';
+import { SceneManager } from '../game/SceneManager.js';
 
 export class PuzzleScene implements Scene {
   private physicsWorld: PhysicsWorld;
@@ -20,7 +20,7 @@ export class PuzzleScene implements Scene {
   private ground: PhysicsObject | null = null;
   private walls: PhysicsObject[] = [];
   private camera: THREE.PerspectiveCamera;
-  private sceneManager: any = null; // Will be set by Game
+  private sceneManager: SceneManager | null = null; // Will be set by Game
   private scene: THREE.Scene;
   private puzzleLights: THREE.Light[] = [];
   private groundMesh: THREE.Mesh | null = null;
@@ -44,8 +44,12 @@ export class PuzzleScene implements Scene {
     this.setupPuzzleCallbacks();
   }
 
-  public setSceneManager(sceneManager: any): void {
+  public setSceneManager(sceneManager: SceneManager): void {
     this.sceneManager = sceneManager;
+  }
+
+  public getCamera(): THREE.Camera {
+    return this.camera;
   }
 
   private setupScene(scene: THREE.Scene, _camera: THREE.PerspectiveCamera): void {

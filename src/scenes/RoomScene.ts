@@ -1,8 +1,7 @@
-import { SceneManager } from '../game/SceneManager.js';
 import * as THREE from 'three';
 import { Scene } from '../game/Scene.js';
-
-
+import { SceneManager } from '../game/SceneManager.js';
+import { InteractableObject, InteractionType, InteractableObjectData } from '../objects/InteractableObject.js';
 
 interface Room {
   name: string;
@@ -37,6 +36,13 @@ export class RoomScene implements Scene {
   private onSceneExitCallback?: (targetScene: string) => void;
   private sceneManager: SceneManager | null = null;
   
+  // Interaction system
+  private interactableObjects: InteractableObject[] = [];
+  private hoveredObject: InteractableObject | null = null;
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private mouse: THREE.Vector2 = new THREE.Vector2();
+  private interactionUI: HTMLDivElement | null = null;
+  
   // Pathfinding grid
   private gridSize: number = 0.5;
   private gridWidth: number = 60;
@@ -70,7 +76,10 @@ export class RoomScene implements Scene {
     this.initializeGrid();
     this.setupRooms();
     this.setupPlayer();
+    this.setupInteractableObjects();
+    this.setupInteractionUI();
     this.setupClickHandler();
+    this.setupMouseMoveHandler();
     this.setupResizeHandler();
   }
 
@@ -80,6 +89,128 @@ export class RoomScene implements Scene {
 
   public getCamera(): THREE.Camera {
     return this.camera;
+  }
+
+  private setupInteractionUI(): void {
+    // Create UI element for interaction messages
+    this.interactionUI = document.createElement('div');
+    this.interactionUI.id = 'interaction-ui';
+    this.interactionUI.style.position = 'absolute';
+    this.interactionUI.style.top = '20px';
+    this.interactionUI.style.left = '50%';
+    this.interactionUI.style.transform = 'translateX(-50%)';
+    this.interactionUI.style.padding = '10px 20px';
+    this.interactionUI.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    this.interactionUI.style.color = 'white';
+    this.interactionUI.style.fontFamily = 'Arial, sans-serif';
+    this.interactionUI.style.fontSize = '16px';
+    this.interactionUI.style.borderRadius = '8px';
+    this.interactionUI.style.display = 'none';
+    this.interactionUI.style.zIndex = '1000';
+    this.interactionUI.style.pointerEvents = 'none';
+    document.body.appendChild(this.interactionUI);
+  }
+
+  private showInteractionMessage(message: string, duration: number = 2000): void {
+    if (this.interactionUI) {
+      this.interactionUI.textContent = message;
+      this.interactionUI.style.display = 'block';
+      
+      setTimeout(() => {
+        if (this.interactionUI) {
+          this.interactionUI.style.display = 'none';
+        }
+      }, duration);
+    }
+  }
+
+  private setupInteractableObjects(): void {
+    // Define interactable objects
+    const objectsData: InteractableObjectData[] = [
+      {
+        id: 'key1',
+        name: 'Golden Key',
+        description: 'A shiny golden key. Might unlock something important.',
+        type: InteractionType.PICKUP,
+        position: { x: -10, y: 0.5, z: -8 }, // Room 1
+        color: 0xffd700,
+        geometry: 'cylinder',
+      },
+      {
+        id: 'potion1',
+        name: 'Health Potion',
+        description: 'A red potion that restores health.',
+        type: InteractionType.PICKUP,
+        position: { x: 0, y: 0.5, z: -10 }, // Room 2
+        color: 0xff0000,
+        geometry: 'cylinder',
+      },
+      {
+        id: 'coin1',
+        name: 'Gold Coin',
+        description: 'A valuable gold coin.',
+        type: InteractionType.PICKUP,
+        position: { x: 10, y: 0.5, z: -10 }, // Room 3
+        color: 0xffd700,
+        geometry: 'sphere',
+      },
+      {
+        id: 'statue1',
+        name: 'Ancient Statue',
+        description: 'An old statue with mysterious inscriptions. Cannot be moved.',
+        type: InteractionType.EXAMINE,
+        position: { x: -10, y: 0.5, z: 0 }, // Room 4
+        color: 0x808080,
+        geometry: 'box',
+      },
+      {
+        id: 'gem1',
+        name: 'Blue Gem',
+        description: 'A glowing blue gemstone.',
+        type: InteractionType.PICKUP,
+        position: { x: 10, y: 0.5, z: 0 }, // Room 6
+        color: 0x0000ff,
+        geometry: 'sphere',
+      },
+    ];
+
+    // Create interactable objects
+    objectsData.forEach(data => {
+      const obj = new InteractableObject(data);
+      this.interactableObjects.push(obj);
+      this.scene.add(obj.mesh);
+    });
+  }
+
+  private setupMouseMoveHandler(): void {
+    this.renderer.domElement.addEventListener('mousemove', (event) => {
+      this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      
+      // Check for interactable objects
+      const interactableMeshes = this.interactableObjects.map(obj => obj.mesh);
+      const intersects = this.raycaster.intersectObjects(interactableMeshes);
+
+      // Clear previous hover
+      if (this.hoveredObject) {
+        this.hoveredObject.unhighlight();
+        this.hoveredObject = null;
+        this.renderer.domElement.style.cursor = 'default';
+      }
+
+      // Highlight hovered object
+      if (intersects.length > 0) {
+        const mesh = intersects[0].object as THREE.Mesh;
+        const obj = mesh.userData.interactableObject as InteractableObject;
+        if (obj) {
+          obj.highlight();
+          this.hoveredObject = obj;
+          this.renderer.domElement.style.cursor = 'pointer';
+        }
+      }
+    });
   }
 
   private setupResizeHandler(): void {
@@ -99,7 +230,7 @@ export class RoomScene implements Scene {
     for (let x = 0; x < this.gridWidth; x++) {
       this.grid[x] = [];
       for (let z = 0; z < this.gridDepth; z++) {
-        this.grid[x][z] = false; // Default not walkable
+        this.grid[x][z] = false;
       }
     }
   }
@@ -121,7 +252,7 @@ export class RoomScene implements Scene {
 
   private setupRooms(): void {
     const roomSize = 6;
-    const spacing = 10; // Increased spacing to make corridors more visible
+    const spacing = 10;
     const corridorWidth = 2;
     
     this.rooms = [
@@ -141,9 +272,7 @@ export class RoomScene implements Scene {
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
     const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
 
-    // Create Rooms
     this.rooms.forEach((room) => {
-      // Floor
       const floorGeometry = new THREE.PlaneGeometry(room.width, room.depth);
       const floor = new THREE.Mesh(floorGeometry, room.hasPuzzle ? puzzleFloorMaterial : floorMaterial);
       floor.rotation.x = -Math.PI / 2;
@@ -151,13 +280,9 @@ export class RoomScene implements Scene {
       this.scene.add(floor);
       this.roomMeshes.push(floor);
 
-      // Mark walkable
       this.setWalkableArea(room.x, room.z, room.width, room.depth);
-
-      // Walls
       this.createRoomWalls(room, wallMaterial);
 
-      // Puzzle Indicator
       if (room.hasPuzzle) {
         const indicatorGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
         const indicatorMaterial = new THREE.MeshStandardMaterial({ 
@@ -171,23 +296,17 @@ export class RoomScene implements Scene {
       }
     });
 
-    // Create Corridors (Connecting adjacent rooms)
-    // Horizontal corridors
     for (let row = 0; row < 3; row++) {
       const z = (row - 1) * spacing;
-      // Connect col 0 to 1, 1 to 2
       this.createCorridor(-spacing/2, z, spacing - roomSize, corridorWidth, corridorMaterial);
       this.createCorridor(spacing/2, z, spacing - roomSize, corridorWidth, corridorMaterial);
     }
-    // Vertical corridors
     for (let col = 0; col < 3; col++) {
       const x = (col - 1) * spacing;
-      // Connect row 0 to 1, 1 to 2
       this.createCorridor(x, -spacing/2, corridorWidth, spacing - roomSize, corridorMaterial);
       this.createCorridor(x, spacing/2, corridorWidth, spacing - roomSize, corridorMaterial);
     }
 
-    // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     this.scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -199,20 +318,19 @@ export class RoomScene implements Scene {
     const geometry = new THREE.PlaneGeometry(width, depth);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.01, z); // Slightly above 0 to avoid z-fighting overlap with possible edges
+    mesh.position.set(x, 0.01, z);
     this.scene.add(mesh);
     this.roomMeshes.push(mesh);
     this.setWalkableArea(x, z, width, depth);
   }
 
   private createRoomWalls(room: Room, material: THREE.Material): void {
-    const h = 1.5; // Wall height
-    const t = 0.2; // Wall thickness
+    const h = 1.5;
+    const t = 0.2;
     const w = room.width;
     const d = room.depth;
     const doorWidth = 2.5;
 
-    // Helper to create a wall segment
     const addWall = (bx: number, bz: number, bw: number, bd: number) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(bw, h, bd), material);
       mesh.position.set(room.x + bx, h/2, room.z + bz);
@@ -220,43 +338,31 @@ export class RoomScene implements Scene {
       this.roomMeshes.push(mesh);
     };
 
-    // North Wall (Top)
-    if (room.z > -10) { // If not top row, has door (actually grid is -spacing, 0, spacing. Top is -spacing)
-       // Check if connected to top. Row indices: 0 (-spacing), 1 (0), 2 (spacing)
-       // If z is 0 or spacing, there is a room above.
-       // Actually, let's just put doors everywhere internally and solid walls on the perimeter.
-    }
+    const gridX = Math.round(room.x / 10) + 1;
+    const gridZ = Math.round(room.z / 10) + 1;
 
-    // Simplified logic: Check grid position
-    const gridX = Math.round(room.x / 10) + 1; // -1,0,1 -> 0,1,2
-    const gridZ = Math.round(room.z / 10) + 1; // -1,0,1 -> 0,1,2
-
-    // North (-Z)
-    if (gridZ > 0) { // Connects to north
-      addWall(-(w/4 + doorWidth/4), -d/2, w/2 - doorWidth/2, t); // Left part
-      addWall((w/4 + doorWidth/4), -d/2, w/2 - doorWidth/2, t);  // Right part
-    } else { // Solid wall
+    if (gridZ > 0) {
+      addWall(-(w/4 + doorWidth/4), -d/2, w/2 - doorWidth/2, t);
+      addWall((w/4 + doorWidth/4), -d/2, w/2 - doorWidth/2, t);
+    } else {
       addWall(0, -d/2, w, t);
     }
 
-    // South (+Z)
-    if (gridZ < 2) { // Connects to south
+    if (gridZ < 2) {
       addWall(-(w/4 + doorWidth/4), d/2, w/2 - doorWidth/2, t);
       addWall((w/4 + doorWidth/4), d/2, w/2 - doorWidth/2, t);
     } else {
       addWall(0, d/2, w, t);
     }
 
-    // West (-X)
-    if (gridX > 0) { // Connects to west
+    if (gridX > 0) {
       addWall(-w/2, -(d/4 + doorWidth/4), t, d/2 - doorWidth/2);
       addWall(-w/2, (d/4 + doorWidth/4), t, d/2 - doorWidth/2);
     } else {
       addWall(-w/2, 0, t, d);
     }
 
-    // East (+X)
-    if (gridX < 2) { // Connects to east
+    if (gridX < 2) {
       addWall(w/2, -(d/4 + doorWidth/4), t, d/2 - doorWidth/2);
       addWall(w/2, (d/4 + doorWidth/4), t, d/2 - doorWidth/2);
     } else {
@@ -267,41 +373,60 @@ export class RoomScene implements Scene {
   private setupPlayer(): void {
     this.player = new THREE.Group();
 
-    // Body
     const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 16);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4169e1 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.4;
     this.player.add(body);
 
-    // Head
     const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
     const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 0.95;
     this.player.add(head);
 
-    // Spawn in Room 1 (top-left, not the puzzle room)
     this.player.position.set(-10, 0, -10);
     this.scene.add(this.player);
     this.currentRoom = this.rooms.find(r => r.x === -10 && r.z === -10) || null;
   }
 
   private setupClickHandler(): void {
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
     this.renderer.domElement.addEventListener('click', (event) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      raycaster.setFromCamera(mouse, this.camera);
-      const intersects = raycaster.intersectObjects(this.roomMeshes);
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      
+      // First check for interactable objects
+      const interactableMeshes = this.interactableObjects.map(obj => obj.mesh);
+      const objectIntersects = this.raycaster.intersectObjects(interactableMeshes);
+
+      if (objectIntersects.length > 0) {
+        const mesh = objectIntersects[0].object as THREE.Mesh;
+        const obj = mesh.userData.interactableObject as InteractableObject;
+        if (obj) {
+          const result = obj.interact();
+          this.showInteractionMessage(result.message);
+          
+          if (result.success) {
+            // Remove object from scene and list
+            this.scene.remove(obj.mesh);
+            const index = this.interactableObjects.indexOf(obj);
+            if (index > -1) {
+              this.interactableObjects.splice(index, 1);
+            }
+            obj.dispose();
+          }
+          return;
+        }
+      }
+
+      // Then check for room clicks (movement and puzzle)
+      const intersects = this.raycaster.intersectObjects(this.roomMeshes);
 
       if (intersects.length > 0) {
         const point = intersects[0].point;
         
-        // Check puzzle click
         if (this.puzzleIndicator) {
           const distance = point.distanceTo(this.puzzleIndicator.position);
           if (distance < 1.5) {
@@ -312,7 +437,6 @@ export class RoomScene implements Scene {
           }
         }
 
-        // Pathfinding
         if (this.player) {
           const start = this.player.position;
           const path = this.findPath(start, point);
@@ -325,7 +449,6 @@ export class RoomScene implements Scene {
   }
 
   private findPath(start: THREE.Vector3, end: THREE.Vector3): THREE.Vector3[] {
-    // Convert world coords to grid coords
     const startX = Math.floor((start.x + this.gridOffsetX) / this.gridSize);
     const startZ = Math.floor((start.z + this.gridOffsetZ) / this.gridSize);
     const endX = Math.floor((end.x + this.gridOffsetX) / this.gridSize);
@@ -333,9 +456,8 @@ export class RoomScene implements Scene {
 
     if (startX < 0 || startX >= this.gridWidth || startZ < 0 || startZ >= this.gridDepth) return [];
     if (endX < 0 || endX >= this.gridWidth || endZ < 0 || endZ >= this.gridDepth) return [];
-    if (!this.grid[endX][endZ]) return []; // Target unreachable
+    if (!this.grid[endX][endZ]) return [];
 
-    // A* Implementation
     const openList: GridNode[] = [];
     const closedList: boolean[][] = [];
     for(let i=0; i<this.gridWidth; i++) closedList[i] = new Array(this.gridDepth).fill(false);
@@ -344,7 +466,6 @@ export class RoomScene implements Scene {
     openList.push(startNode);
 
     while (openList.length > 0) {
-      // Get node with lowest f
       let lowestIndex = 0;
       for (let i = 1; i < openList.length; i++) {
         if (openList[i].f < openList[lowestIndex].f) {
@@ -353,7 +474,6 @@ export class RoomScene implements Scene {
       }
       const current = openList[lowestIndex];
 
-      // Found target
       if (current.x === endX && current.z === endZ) {
         const path: THREE.Vector3[] = [];
         let temp: GridNode | null = current;
@@ -368,11 +488,9 @@ export class RoomScene implements Scene {
         return path.reverse();
       }
 
-      // Move from open to closed
       openList.splice(lowestIndex, 1);
       closedList[current.x][current.z] = true;
 
-      // Check neighbors
       const neighbors = [
         { x: 0, z: -1 }, { x: 0, z: 1 }, { x: -1, z: 0 }, { x: 1, z: 0 }
       ];
@@ -410,7 +528,7 @@ export class RoomScene implements Scene {
       }
     }
 
-    return []; // No path found
+    return [];
   }
 
   public setOnSceneExit(callback: (targetScene: string) => void): void {
@@ -422,12 +540,10 @@ export class RoomScene implements Scene {
   }
 
   public enter(): void {
-    // Register this scene's camera with SceneManager
     if (this.sceneManager) {
       this.sceneManager.setCurrentCamera(this.camera);
     }
     
-    // Show room objects
     this.roomMeshes.forEach(mesh => {
       mesh.visible = true;
     });
@@ -437,14 +553,17 @@ export class RoomScene implements Scene {
     if (this.puzzleIndicator) {
       this.puzzleIndicator.visible = true;
     }
+    
+    // Show interactable objects
+    this.interactableObjects.forEach(obj => {
+      obj.mesh.visible = true;
+    });
 
-    // Hide Instructions from Puzzle Scene if visible
     const instructions = document.getElementById('instructions');
     if (instructions) {
       instructions.style.display = 'none';
     }
     
-    // Reset player to Room 1 (top-left, not the puzzle room)
     if (this.player) {
       this.player.position.set(-10, 0, -10);
       this.playerPath = [];
@@ -453,7 +572,6 @@ export class RoomScene implements Scene {
   }
 
   public exit(): void {
-    // Hide room objects
     this.roomMeshes.forEach(mesh => {
       mesh.visible = false;
     });
@@ -463,6 +581,18 @@ export class RoomScene implements Scene {
     if (this.puzzleIndicator) {
       this.puzzleIndicator.visible = false;
     }
+    
+    // Hide interactable objects
+    this.interactableObjects.forEach(obj => {
+      obj.mesh.visible = false;
+      obj.unhighlight();
+    });
+    
+    // Clear hover state
+    if (this.hoveredObject) {
+      this.hoveredObject = null;
+    }
+    this.renderer.domElement.style.cursor = 'default';
   }
 
   public update(deltaTime: number): void {
@@ -478,9 +608,6 @@ export class RoomScene implements Scene {
         direction.normalize();
         const moveDist = this.playerSpeed * deltaTime;
         this.player.position.add(direction.multiplyScalar(Math.min(moveDist, dist)));
-        
-        // Rotate player to face movement
-        // ...
       }
     }
   }
@@ -497,7 +624,6 @@ export class RoomScene implements Scene {
 
     if (this.player) {
       this.scene.remove(this.player);
-      // traverse to dispose children...
       this.player = null;
     }
 
@@ -508,6 +634,19 @@ export class RoomScene implements Scene {
         this.puzzleIndicator.material.dispose();
       }
       this.puzzleIndicator = null;
+    }
+
+    // Clean up interactable objects
+    this.interactableObjects.forEach(obj => {
+      this.scene.remove(obj.mesh);
+      obj.dispose();
+    });
+    this.interactableObjects = [];
+
+    // Clean up UI
+    if (this.interactionUI && this.interactionUI.parentElement) {
+      this.interactionUI.parentElement.removeChild(this.interactionUI);
+      this.interactionUI = null;
     }
   }
 }
