@@ -4,12 +4,16 @@ import { PuzzleScene } from '../scenes/PuzzleScene.js';
 import { RoomScene } from '../scenes/RoomScene.js';
 import { KeyboardController } from '../objects/KeyboardController.js';
 import { SceneManager } from './SceneManager.js';
+import { Inventory } from '../systems/Inventory.js';
+import { InventoryUI } from '../ui/InventoryUI.js';
 
 export class Game {
   private renderer: Renderer;
   private physicsWorld: PhysicsWorld;
   private sceneManager: SceneManager;
   private keyboardController: KeyboardController;
+  private inventory: Inventory;
+  private inventoryUI: InventoryUI;
   private animationId: number | null = null;
   private lastTime: number = 0;
 
@@ -19,11 +23,16 @@ export class Game {
     this.sceneManager = new SceneManager();
     this.keyboardController = new KeyboardController();
     
+    // Create inventory system
+    this.inventory = new Inventory();
+    this.inventoryUI = new InventoryUI(this.inventory);
+    
     // Create and register the room scene (2D top-down adventure)
     const roomScene = new RoomScene(
       this.renderer.scene,
       this.renderer.camera,
-      this.renderer.renderer
+      this.renderer.renderer,
+      this.inventory // Pass inventory to room scene
     );
     roomScene.setSceneManager(this.sceneManager);
     roomScene.setOnSceneExit((targetScene: string) => {
@@ -37,7 +46,8 @@ export class Game {
       this.physicsWorld,
       this.renderer.renderer,
       this.renderer.scene,
-      this.renderer.camera
+      this.renderer.camera,
+      this.inventory // Pass inventory to puzzle scene
     );
     puzzleScene.setSceneManager(this.sceneManager);
     puzzleScene.setKeyboardController(this.keyboardController);
@@ -81,5 +91,9 @@ export class Game {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+  }
+
+  public getInventory(): Inventory {
+    return this.inventory;
   }
 }

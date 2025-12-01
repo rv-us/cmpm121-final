@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Scene } from '../game/Scene.js';
 import { SceneManager } from '../game/SceneManager.js';
 import { InteractableObject, InteractionType, InteractableObjectData } from '../objects/InteractableObject.js';
+import { Inventory } from '../systems/Inventory.js';
 
 interface Room {
   name: string;
@@ -35,6 +36,7 @@ export class RoomScene implements Scene {
   private puzzleIndicator: THREE.Mesh | null = null;
   private onSceneExitCallback?: (targetScene: string) => void;
   private sceneManager: SceneManager | null = null;
+  private inventory: Inventory;
   
   // Interaction system
   private interactableObjects: InteractableObject[] = [];
@@ -54,10 +56,12 @@ export class RoomScene implements Scene {
   constructor(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
-    renderer: THREE.WebGLRenderer
+    renderer: THREE.WebGLRenderer,
+    inventory: Inventory
   ) {
     this.scene = scene;
     this.renderer = renderer;
+    this.inventory = inventory;
     
     // Create orthographic camera for 2D top-down view
     const aspect = window.innerWidth / window.innerHeight;
@@ -409,6 +413,14 @@ export class RoomScene implements Scene {
           this.showInteractionMessage(result.message);
           
           if (result.success) {
+            // Add to inventory
+            this.inventory.addItem({
+              id: obj.data.id,
+              name: obj.data.name,
+              description: obj.data.description,
+              color: obj.data.color,
+            });
+            
             // Remove object from scene and list
             this.scene.remove(obj.mesh);
             const index = this.interactableObjects.indexOf(obj);

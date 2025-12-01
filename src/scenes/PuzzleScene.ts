@@ -7,6 +7,9 @@ import { Puzzle, PuzzleState } from '../game/Puzzle.js';
 import { GameUI } from '../ui/GameUI.js';
 import { Scene } from '../game/Scene.js';
 import { SceneManager } from '../game/SceneManager.js';
+import { Inventory } from '../systems/Inventory.js';
+
+
 
 export class PuzzleScene implements Scene {
   private physicsWorld: PhysicsWorld;
@@ -24,22 +27,25 @@ export class PuzzleScene implements Scene {
   private scene: THREE.Scene;
   private puzzleLights: THREE.Light[] = [];
   private groundMesh: THREE.Mesh | null = null;
+  private inventory: Inventory;
   
   // Timer system
   private timerElapsed: number = 0;
   private timerMax: number = 10; // 10 seconds
   private onSceneExitCallback?: () => void;
 
-  constructor(physicsWorld: PhysicsWorld, renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+  constructor(physicsWorld: PhysicsWorld, renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, inventory: Inventory) {
     this.physicsWorld = physicsWorld;
     this.renderer = renderer;
     this.camera = camera;
     this.scene = scene;
+    this.inventory = inventory; // Store the inventory reference
     this.puzzle = new Puzzle();
     this.gameUI = new GameUI(scene, camera);
+    this.inventory = inventory;
     // Hide UI initially
     this.gameUI.hideAll();
-
+  
     this.setupScene(scene, camera);
     this.setupPuzzleCallbacks();
   }
