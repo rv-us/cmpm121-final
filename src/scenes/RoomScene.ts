@@ -1,5 +1,8 @@
+import { SceneManager } from '../game/SceneManager.js';
 import * as THREE from 'three';
 import { Scene } from '../game/Scene.js';
+
+
 
 interface Room {
   name: string;
@@ -32,7 +35,7 @@ export class RoomScene implements Scene {
   private currentRoom: Room | null = null;
   private puzzleIndicator: THREE.Mesh | null = null;
   private onSceneExitCallback?: (targetScene: string) => void;
-  private sceneManager: any = null;
+  private sceneManager: SceneManager | null = null;
   
   // Pathfinding grid
   private gridSize: number = 0.5;
@@ -71,8 +74,12 @@ export class RoomScene implements Scene {
     this.setupResizeHandler();
   }
 
-  public setSceneManager(sceneManager: any): void {
+  public setSceneManager(sceneManager: SceneManager): void {
     this.sceneManager = sceneManager;
+  }
+
+  public getCamera(): THREE.Camera {
+    return this.camera;
   }
 
   private setupResizeHandler(): void {

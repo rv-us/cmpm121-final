@@ -1,0 +1,116 @@
+import * as THREE from 'three';
+import { Scene } from './Scene.js';
+
+/**
+ * Manages scene registration, switching, and updates
+ */
+export class SceneManager {
+  private scenes: Map<string, Scene> = new Map();
+  private currentScene: Scene | null = null;
+  private currentCamera: THREE.Camera | null = null;
+
+  /**
+   * Register a scene with the manager
+   * @param scene - The scene to register
+   */
+  public registerScene(scene: Scene): void {
+    const name = scene.getName();
+    if (this.scenes.has(name)) {
+      console.warn(`Scene '${name}' is already registered. Overwriting.`);
+    }
+    this.scenes.set(name, scene);
+    
+    // Set the scene manager reference if the scene supports it
+    if (scene.setSceneManager) {
+      scene.setSceneManager(this);
+    }
+  }
+
+  /**
+   * Switch to a different scene by name
+   * @param sceneName - The name of the scene to switch to
+   */
+  public switchToScene(sceneName: string): void {
+    const nextScene = this.scenes.get(sceneName);
+    
+    if (!nextScene) {
+      console.error(`Scene '${sceneName}' not found. Available scenes:`, 
+        Array.from(this.scenes.keys()));
+      return;
+    }
+
+    // Exit current scene
+    if (this.currentScene) {
+      console.log(`Exiting scene: ${this.currentScene.getName()}`);
+      this.currentScene.exit();
+    }
+
+    // Enter new scene
+    this.currentScene = nextScene;
+    console.log(`Entering scene: ${sceneName}`);
+    this.currentScene.enter();
+
+    // Update camera if scene provides one
+    if (this.currentScene.getCamera) {
+      const sceneCamera = this.currentScene.getCamera();
+      if (sceneCamera) {
+        this.currentCamera = sceneCamera;
+      }
+    }
+  }
+
+  /**
+   * Update the current scene
+   * @param deltaTime - Time elapsed since last frame in seconds
+   */
+  public update(deltaTime: number): void {
+    if (this.currentScene) {
+      this.currentScene.update(deltaTime);
+    }
+  }
+
+  /**
+   * Get the current active scene
+   * @returns The current scene, or null if none is active
+   */
+  public getCurrentScene(): Scene | null {
+    return this.currentScene;
+  }
+
+  /**
+   * Get the camera for the current scene
+   * @returns The current scene's camera, or null
+   */
+  public getCurrentCamera(): THREE.Camera | null {
+    return this.currentCamera;
+  }
+
+  /**
+   * Set the current camera (called by scenes)
+   * @param camera - The camera to use
+   */
+  public setCurrentCamera(camera: THREE.Camera): void {
+    this.currentCamera = camera;
+  }
+
+  /**
+   * Get a scene by name
+   * @param sceneName - The name of the scene to retrieve
+   * @returns The scene, or undefined if not found
+   */
+  public getScene(sceneName: string): Scene | undefined {
+    return this.scenes.get(sceneName);
+  }
+
+  /**
+   * Dispose all registered scenes
+   */
+  public disposeAll(): void {
+    this.scenes.forEach(scene => {
+      scene.dispose();
+    });
+    this.scenes.clear();
+    this.currentScene = null;
+    this.currentCamera = null;
+  }
+}

@@ -1,3 +1,4 @@
+import { SceneManager } from '../game/SceneManager.js';
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PhysicsWorld } from '../game/PhysicsWorld.js';
