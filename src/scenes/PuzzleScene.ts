@@ -9,7 +9,7 @@ import { Scene } from '../game/Scene.js';
 import { SceneManager } from '../game/SceneManager.js';
 import { Inventory } from '../systems/Inventory.js';
 import { GameStateManager } from '../systems/GameStateManager.js';
-
+import { ThemeManager } from '../systems/ThemeManager.js';
 
 
 export class PuzzleScene implements Scene {
@@ -36,13 +36,16 @@ export class PuzzleScene implements Scene {
   private timerMax: number = 10; // 10 seconds
   private onSceneExitCallback?: () => void;
 
+  private themeManager: ThemeManager;
+
   constructor(
     physicsWorld: PhysicsWorld, 
     renderer: THREE.WebGLRenderer, 
     scene: THREE.Scene, 
     camera: THREE.PerspectiveCamera, 
     inventory: Inventory,
-    gameStateManager: GameStateManager
+    gameStateManager: GameStateManager,
+    themeManager: ThemeManager
   ) {
     this.physicsWorld = physicsWorld;
     this.renderer = renderer;
@@ -50,13 +53,18 @@ export class PuzzleScene implements Scene {
     this.scene = scene;
     this.inventory = inventory;
     this.gameStateManager = gameStateManager;
+    this.themeManager = themeManager;
     this.puzzle = new Puzzle();
     this.gameUI = new GameUI(scene, camera);
+    
     // Hide UI initially
     this.gameUI.hideAll();
   
     this.setupScene(scene, camera);
     this.setupPuzzleCallbacks();
+    this.themeManager.onThemeChange(() => {
+      this.applyTheme();
+    });
   }
 
   public setSceneManager(sceneManager: SceneManager): void {
@@ -68,31 +76,41 @@ export class PuzzleScene implements Scene {
   }
 
   private setupScene(scene: THREE.Scene, _camera: THREE.PerspectiveCamera): void {
+    const themeColors = this.themeManager.getThemeColors();
+    
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    ambientLight.visible = false; // Start hidden
+    const ambientLight = new THREE.AmbientLight(
+      themeColors.ambientLightColor, 
+      themeColors.ambientLightIntensity * 0.8 // Slightly dimmer for puzzle
+    );
+    ambientLight.visible = false;
     scene.add(ambientLight);
     this.puzzleLights.push(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  
+    const directionalLight = new THREE.DirectionalLight(
+      themeColors.directionalLightColor, 
+      themeColors.directionalLightIntensity * 1.2 // Slightly brighter for puzzle
+    );
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.visible = false; // Start hidden
+    directionalLight.visible = false;
     scene.add(directionalLight);
     this.puzzleLights.push(directionalLight);
-
+  
     // Ground
     const groundGeometry = new THREE.PlaneGeometry(20, 20);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: themeColors.floorColor 
+    });
     this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
     this.groundMesh.rotation.x = -Math.PI / 2;
     this.groundMesh.position.y = 0;
     this.groundMesh.receiveShadow = true;
-    this.groundMesh.visible = false; // Start hidden
+    this.groundMesh.visible = false;
     scene.add(this.groundMesh);
-
+  
     const groundShape = new CANNON.Plane();
     const groundBody = new CANNON.Body({ 
       mass: 0,
@@ -101,7 +119,7 @@ export class PuzzleScene implements Scene {
     groundBody.addShape(groundShape);
     groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
     this.physicsWorld.addBody(groundBody);
-
+  
     // Create puzzle: Ball rolling to target
     this.createPuzzle(scene);
   }
@@ -402,8 +420,7 @@ export class PuzzleScene implements Scene {
     if (instructions) {
       instructions.style.display = 'block';
     }
-
-    // Register this scene's camera with SceneManager
+  
     if (this.sceneManager) {
       this.sceneManager.setCurrentCamera(this.camera);
     }
@@ -419,11 +436,14 @@ export class PuzzleScene implements Scene {
       obj.mesh.visible = true;
     });
     
+    // Apply current theme
+    this.applyTheme();
+    
     // Scene is entered - reset puzzle state and timer
     this.puzzle.reset();
     this.gameUI.hideAll();
-    this.timerElapsed = 0; // Reset timer
-    this.gameUI.updateTimer(this.timerMax); // Show initial timer
+    this.timerElapsed = 0;
+    this.gameUI.updateTimer(this.timerMax);
     
     // Reset ball position
     if (this.ball) {
@@ -463,5 +483,34 @@ export class PuzzleScene implements Scene {
     this.walls = [];
     this.target = null;
     this.ball = null;
+  }
+
+  private applyTheme(): void {
+    const themeColors = this.themeManager.getThemeColors();
+    
+    // Update lights
+    this.puzzleLights.forEach((light, index) => {
+      if (light instanceof THREE.AmbientLight) {
+        light.color.setHex(themeColors.ambientLightColor);
+        light.intensity = themeColors.ambientLightIntensity * 0.8;
+      } else if (light instanceof THREE.DirectionalLight) {
+        light.color.setHex(themeColors.directionalLightColor);
+        light.intensity = themeColors.directionalLightIntensity * 1.2;
+      }
+    });
+    
+    // Update ground color
+    if (this.groundMesh && this.groundMesh.material instanceof THREE.MeshStandardMaterial) {
+      this.groundMesh.material.color.setHex(themeColors.floorColor);
+    }
+    
+    // Update wall colors
+    this.walls.forEach(wall => {
+      if (wall.mesh.material instanceof THREE.MeshStandardMaterial) {
+        wall.mesh.material.color.setHex(themeColors.wallColor);
+      }
+    });
+    
+    console.log(`Theme applied to PuzzleScene: ${this.themeManager.getCurrentTheme()}`);
   }
 }

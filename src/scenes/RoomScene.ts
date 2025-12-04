@@ -3,6 +3,7 @@ import { Scene } from '../game/Scene.js';
 import { SceneManager } from '../game/SceneManager.js';
 import { InteractableObject, InteractionType, InteractableObjectData } from '../objects/InteractableObject.js';
 import { Inventory } from '../systems/Inventory.js';
+import { ThemeManager } from '../systems/ThemeManager.js';
 
 interface Room {
   name: string;
@@ -37,6 +38,11 @@ export class RoomScene implements Scene {
   private onSceneExitCallback?: (targetScene: string) => void;
   private sceneManager: SceneManager | null = null;
   private inventory: Inventory;
+  private themeManager: ThemeManager;
+  
+  // Lighting (will be updated based on theme)
+  private ambientLight: THREE.AmbientLight | null = null;
+  private directionalLight: THREE.DirectionalLight | null = null;
   
   // Interaction system
   private interactableObjects: InteractableObject[] = [];
@@ -58,11 +64,13 @@ export class RoomScene implements Scene {
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     renderer: THREE.WebGLRenderer,
-    inventory: Inventory
+    inventory: Inventory,
+    themeManager: ThemeManager
   ) {
     this.scene = scene;
     this.renderer = renderer;
     this.inventory = inventory;
+    this.themeManager = themeManager;
     
     // Create orthographic camera for 2D top-down view
     const aspect = window.innerWidth / window.innerHeight;
@@ -86,6 +94,14 @@ export class RoomScene implements Scene {
     this.setupClickHandler();
     this.setupMouseMoveHandler();
     this.setupResizeHandler();
+    
+    // Listen for theme changes
+    this.themeManager.onThemeChange(() => {
+      this.applyTheme();
+    });
+    
+    // Apply initial theme
+    this.applyTheme();
   }
 
   public setSceneManager(sceneManager: SceneManager): void {
@@ -260,6 +276,9 @@ export class RoomScene implements Scene {
     const spacing = 10;
     const corridorWidth = 2;
     
+    // Get theme colors
+    const themeColors = this.themeManager.getThemeColors();
+    
     this.rooms = [
       { name: 'Room 1', x: -spacing, z: -spacing, width: roomSize, depth: roomSize, hasPuzzle: false },
       { name: 'Room 2', x: 0, z: -spacing, width: roomSize, depth: roomSize, hasPuzzle: false },
@@ -272,10 +291,10 @@ export class RoomScene implements Scene {
       { name: 'Room 9', x: spacing, z: spacing, width: roomSize, depth: roomSize, hasPuzzle: false },
     ];
 
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-    const puzzleFloorMaterial = new THREE.MeshStandardMaterial({ color: 0x90ee90 });
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
-    const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: themeColors.floorColor });
+    const puzzleFloorMaterial = new THREE.MeshStandardMaterial({ color: themeColors.puzzleFloorColor });
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: themeColors.wallColor });
+    const corridorMaterial = new THREE.MeshStandardMaterial({ color: themeColors.corridorColor });
 
     this.rooms.forEach((room) => {
       const floorGeometry = new THREE.PlaneGeometry(room.width, room.depth);
@@ -719,5 +738,57 @@ export class RoomScene implements Scene {
       }
       obj.dispose();
     });
+  }
+
+  /**
+   * Apply current theme to the scene
+   */
+  private applyTheme(): void {
+    const themeColors = this.themeManager.getThemeColors();
+    
+    // Update lighting
+    if (this.ambientLight) {
+      this.ambientLight.color.setHex(themeColors.ambientLightColor);
+      this.ambientLight.intensity = themeColors.ambientLightIntensity;
+    }
+    
+    if (this.directionalLight) {
+      this.directionalLight.color.setHex(themeColors.directionalLightColor);
+      this.directionalLight.intensity = themeColors.directionalLightIntensity;
+    }
+    
+    // Update fog
+    if (this.scene.fog && this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.color.setHex(themeColors.fogColor);
+      this.scene.fog.near = themeColors.fogNear;
+      this.scene.fog.far = themeColors.fogFar;
+    }
+    
+    // Update room materials
+    this.roomMeshes.forEach((mesh, index) => {
+      if (mesh.material instanceof THREE.MeshStandardMaterial) {
+        // Determine what type of surface this is based on its current color
+        const currentColor = mesh.material.color.getHex();
+        
+        // Check if it's a puzzle floor (greenish)
+        if (currentColor >= 0x80ee80 && currentColor <= 0xa0eea0) {
+          mesh.material.color.setHex(themeColors.puzzleFloorColor);
+        }
+        // Check if it's a wall (darker)
+        else if (currentColor >= 0x222222 && currentColor <= 0xbbbbbb) {
+          mesh.material.color.setHex(themeColors.wallColor);
+        }
+        // Check if it's a corridor (medium)
+        else if (currentColor >= 0xaaaaaa && currentColor <= 0xd0d0d0) {
+          mesh.material.color.setHex(themeColors.corridorColor);
+        }
+        // Otherwise it's a regular floor
+        else {
+          mesh.material.color.setHex(themeColors.floorColor);
+        }
+      }
+    });
+    
+    console.log(`Theme applied to RoomScene: ${this.themeManager.getCurrentTheme()}`);
   }
 }

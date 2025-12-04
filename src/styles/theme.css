@@ -1,0 +1,64 @@
+/* Theme CSS Variables */
+:root {
+    --ui-background: rgba(0, 0, 0, 0.9);
+    --ui-text: #ffffff;
+    --ui-border: #4CAF50;
+    --ui-accent: #64B5F6;
+  }
+  
+  /* Apply theme to existing UI elements */
+  #interaction-ui {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  #inventory-toggle {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  #inventory-ui {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  #save-load-toggle {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  #save-load-ui {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  #progress-hud {
+    background-color: var(--ui-background) !important;
+    color: var(--ui-text) !important;
+    border-color: var(--ui-border) !important;
+  }
+  
+  /* Smooth transitions for theme changes */
+  #interaction-ui,
+  #inventory-toggle,
+  #inventory-ui,
+  #save-load-toggle,
+  #save-load-ui,
+  #progress-hud {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  
+  /* Light theme specific adjustments using media query */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ui-background: rgba(255, 255, 255, 0.95);
+      --ui-text: #000000;
+      --ui-border: #4CAF50;
+      --ui-accent: #2196F3;
+    }
+  }

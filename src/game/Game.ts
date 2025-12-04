@@ -11,6 +11,7 @@ import { EndingUI } from '../ui/EndingUI.js';
 import { ProgressHUD } from '../ui/ProgressHUD.js';
 import { SaveSystem, SaveData } from '../systems/SaveSystem.js';
 import { SaveLoadUI } from '../ui/SaveLoadUI.js';
+import { ThemeManager } from '../systems/ThemeManager.js';
 
 export class Game {
   private renderer: Renderer;
@@ -24,6 +25,7 @@ export class Game {
   private progressHUD: ProgressHUD;
   private saveSystem: SaveSystem;
   private saveLoadUI: SaveLoadUI;
+  private themeManager: ThemeManager;
   private animationId: number | null = null;
   private lastTime: number = 0;
   private roomScene?: RoomScene;
@@ -34,6 +36,10 @@ export class Game {
     this.physicsWorld = new PhysicsWorld();
     this.sceneManager = new SceneManager();
     this.keyboardController = new KeyboardController();
+    
+    // Create theme manager
+    this.themeManager = new ThemeManager();
+    this.themeManager.applyThemeToCSS();
     
     // Create inventory system
     this.inventory = new Inventory();
@@ -78,7 +84,8 @@ export class Game {
       this.renderer.scene,
       this.renderer.camera,
       this.renderer.renderer,
-      this.inventory // Pass inventory to room scene
+      this.inventory, // Pass inventory to room scene
+      this.themeManager // Pass theme manager
     );
     this.roomScene = roomScene; // Store reference for save/load
     roomScene.setSceneManager(this.sceneManager);
@@ -96,7 +103,8 @@ export class Game {
       this.renderer.scene,
       this.renderer.camera,
       this.inventory, // Pass inventory to puzzle scene
-      this.gameStateManager // Pass game state manager
+      this.gameStateManager, // Pass game state manager
+      this.themeManager // Pass theme manager
     );
     this.puzzleScene = puzzleScene; // Store reference for save/load
     puzzleScene.setSceneManager(this.sceneManager);
