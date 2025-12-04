@@ -40,6 +40,7 @@ export class RoomScene implements Scene {
   
   // Interaction system
   private interactableObjects: InteractableObject[] = [];
+  private removedObjectIds: Set<string> = new Set(); // Track removed objects for save/load
   private hoveredObject: InteractableObject | null = null;
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private mouse: THREE.Vector2 = new THREE.Vector2();
@@ -421,6 +422,9 @@ export class RoomScene implements Scene {
               color: obj.data.color,
             });
             
+            // Track removed object
+            this.removedObjectIds.add(obj.data.id);
+            
             // Remove object from scene and list
             this.scene.remove(obj.mesh);
             const index = this.interactableObjects.indexOf(obj);
@@ -660,5 +664,60 @@ export class RoomScene implements Scene {
       this.interactionUI.parentElement.removeChild(this.interactionUI);
       this.interactionUI = null;
     }
+  }
+
+  /**
+   * Get player position for saving
+   */
+  public getPlayerPosition(): { x: number; y: number; z: number } {
+    if (this.player) {
+      return {
+        x: this.player.position.x,
+        y: this.player.position.y,
+        z: this.player.position.z,
+      };
+    }
+    return { x: -10, y: 0, z: -10 }; // Default position
+  }
+
+  /**
+   * Set player position for loading
+   */
+  public setPlayerPosition(position: { x: number; y: number; z: number }): void {
+    if (this.player) {
+      this.player.position.set(position.x, position.y, position.z);
+      this.playerPath = []; // Clear any existing path
+    }
+  }
+
+  /**
+   * Get removed object IDs for saving
+   */
+  public getRemovedObjectIds(): string[] {
+    return Array.from(this.removedObjectIds);
+  }
+
+  /**
+   * Set removed object IDs for loading (removes objects from scene)
+   */
+  public setRemovedObjectIds(ids: string[]): void {
+    this.removedObjectIds = new Set(ids);
+    
+    // Remove objects that should be removed
+    const objectsToRemove: InteractableObject[] = [];
+    this.interactableObjects.forEach(obj => {
+      if (this.removedObjectIds.has(obj.data.id)) {
+        objectsToRemove.push(obj);
+      }
+    });
+    
+    objectsToRemove.forEach(obj => {
+      this.scene.remove(obj.mesh);
+      const index = this.interactableObjects.indexOf(obj);
+      if (index > -1) {
+        this.interactableObjects.splice(index, 1);
+      }
+      obj.dispose();
+    });
   }
 }
