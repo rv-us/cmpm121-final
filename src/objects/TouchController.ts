@@ -60,6 +60,11 @@ export class TouchController {
   private setupTouchListeners(): void {
     // Touch start
     window.addEventListener('touchstart', (e) => {
+      // Only show joystick if ball is set (i.e., we're in PuzzleScene)
+      if (!this.ball) {
+        return; // Don't interfere with RoomScene touch controls
+      }
+
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         this.touchStartX = touch.clientX;
@@ -80,7 +85,12 @@ export class TouchController {
 
     // Touch move
     window.addEventListener('touchmove', (e) => {
-      if (this.isTouching && e.touches.length > 0 && this.joystickActive) {
+      // Only handle joystick movement if ball is set (i.e., we're in PuzzleScene)
+      if (!this.ball || !this.isTouching || !this.joystickActive) {
+        return;
+      }
+
+      if (e.touches.length > 0) {
         e.preventDefault();
         const touch = e.touches[0];
         const deltaX = touch.clientX - this.joystickCenterX;
@@ -142,8 +152,17 @@ export class TouchController {
     }, { passive: false });
   }
 
-  public setBall(ball: PhysicsObject): void {
+  public setBall(ball: PhysicsObject | null): void {
     this.ball = ball;
+    // Hide joystick when ball is cleared (e.g., exiting puzzle scene)
+    if (!ball && this.joystickBase) {
+      this.joystickBase.style.display = 'none';
+      this.joystickActive = false;
+      this.currentForce.set(0, 0, 0);
+      if (this.joystickStick) {
+        this.joystickStick.style.transform = 'translate(-50%, -50%)';
+      }
+    }
   }
 
   public update(): void {

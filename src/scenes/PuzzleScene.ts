@@ -483,6 +483,11 @@ export class PuzzleScene implements Scene {
       instructions.style.display = 'none';
     }
 
+    // Clear ball reference from touch controller to hide joystick
+    if (this.touchController) {
+      this.touchController.setBall(null);
+    }
+
     // Hide puzzle objects when exiting
     this.puzzleLights.forEach(light => {
       light.visible = false;
