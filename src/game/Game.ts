@@ -3,6 +3,7 @@ import { PhysicsWorld } from './PhysicsWorld.js';
 import { PuzzleScene } from '../scenes/PuzzleScene.js';
 import { RoomScene } from '../scenes/RoomScene.js';
 import { KeyboardController } from '../objects/KeyboardController.js';
+import { TouchController } from '../objects/TouchController.js';
 import { SceneManager } from './SceneManager.js';
 import { Inventory } from '../systems/Inventory.js';
 import { InventoryUI } from '../ui/InventoryUI.js';
@@ -12,12 +13,14 @@ import { ProgressHUD } from '../ui/ProgressHUD.js';
 import { SaveSystem, SaveData } from '../systems/SaveSystem.js';
 import { SaveLoadUI } from '../ui/SaveLoadUI.js';
 import { ThemeManager } from '../systems/ThemeManager.js';
+import { UndoSystem } from '../systems/UndoSystem.js';
 
 export class Game {
   private renderer: Renderer;
   private physicsWorld: PhysicsWorld;
   private sceneManager: SceneManager;
   private keyboardController: KeyboardController;
+  private touchController: TouchController;
   private inventory: Inventory;
   private inventoryUI: InventoryUI;
   private gameStateManager: GameStateManager;
@@ -26,6 +29,7 @@ export class Game {
   private saveSystem: SaveSystem;
   private saveLoadUI: SaveLoadUI;
   private themeManager: ThemeManager;
+  private undoSystem: UndoSystem;
   private animationId: number | null = null;
   private lastTime: number = 0;
   private roomScene?: RoomScene;
@@ -36,6 +40,11 @@ export class Game {
     this.physicsWorld = new PhysicsWorld();
     this.sceneManager = new SceneManager();
     this.keyboardController = new KeyboardController();
+    this.touchController = new TouchController();
+    
+    // Create undo system
+    this.undoSystem = new UndoSystem();
+    this.sceneManager.setUndoSystem(this.undoSystem);
     
     // Create theme manager
     this.themeManager = new ThemeManager();
@@ -85,10 +94,17 @@ export class Game {
       this.renderer.camera,
       this.renderer.renderer,
       this.inventory, // Pass inventory to room scene
-      this.themeManager // Pass theme manager
+      this.themeManager, // Pass theme manager
+      this.undoSystem // Pass undo system
     );
     this.roomScene = roomScene; // Store reference for save/load
     roomScene.setSceneManager(this.sceneManager);
+    
+    // Set up callback to get player position for undo system
+    this.sceneManager.setGetPlayerPositionCallback(() => {
+      return this.roomScene?.getPlayerPosition();
+    });
+    
     roomScene.setOnSceneExit((targetScene: string) => {
       console.log(`Room scene exiting to: ${targetScene}`);
       this.sceneManager.switchToScene(targetScene);
@@ -109,6 +125,7 @@ export class Game {
     this.puzzleScene = puzzleScene; // Store reference for save/load
     puzzleScene.setSceneManager(this.sceneManager);
     puzzleScene.setKeyboardController(this.keyboardController);
+    puzzleScene.setTouchController(this.touchController);
     // Set callback for when puzzle is completed (returns to room scene)
     puzzleScene.setOnSceneExit(() => {
       console.log('Puzzle completed - returning to room scene');
@@ -118,10 +135,83 @@ export class Game {
     this.sceneManager.registerScene(puzzleScene);
     
     // Start with the room scene
-    this.sceneManager.switchToScene('room');
+    this.sceneManager.switchToScene('room', false); // Don't record initial scene load as undo
     
     // Try to load auto-save on startup
     this.tryLoadAutoSave();
+    
+    // Set up keyboard listener for undo (Ctrl+Z or Cmd+Z)
+    this.setupUndoKeyboardListener();
+  }
+
+  private setupUndoKeyboardListener(): void {
+    window.addEventListener('keydown', (event) => {
+      // Check for Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        
+        // Don't allow undo if game is in ending state
+        const currentState = this.gameStateManager.getState();
+        if (currentState === GameState.VICTORY || currentState === GameState.GAME_OVER) {
+          return;
+        }
+        
+        const success = this.undoSystem.undo();
+        if (success) {
+          this.showUndoMessage();
+        }
+      }
+    });
+  }
+
+  private showUndoMessage(): void {
+    // Create or update toast message
+    let toast = document.getElementById('undo-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'undo-toast';
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      `;
+      document.body.appendChild(toast);
+    }
+    
+    const actionType = this.undoSystem.getLastActionType();
+    let message = 'Undone';
+    if (actionType) {
+      switch (actionType) {
+        case 'scene_transition':
+          message = 'Undone: Scene transition';
+          break;
+        case 'object_interaction':
+          message = 'Undone: Item pickup';
+          break;
+        case 'player_movement':
+          message = 'Undone: Player movement';
+          break;
+      }
+    }
+    
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    
+    // Fade out after 2 seconds
+    setTimeout(() => {
+      if (toast) {
+        toast.style.opacity = '0';
+      }
+    }, 2000);
   }
 
   public start(): void {
@@ -191,6 +281,9 @@ export class Game {
   private loadGameState(data: SaveData): void {
     console.log('Loading game state...', data);
 
+    // Clear undo history when loading (don't want to undo back to previous session)
+    this.undoSystem.clear();
+
     // Clear current inventory
     this.inventory.clear();
 
@@ -210,8 +303,8 @@ export class Game {
       this.roomScene.setRemovedObjectIds(data.interactableObjectsRemoved);
     }
 
-    // Switch to saved scene
-    this.sceneManager.switchToScene(data.playerState.currentScene);
+    // Switch to saved scene (don't record as undo action)
+    this.sceneManager.switchToScene(data.playerState.currentScene, false);
 
     // Restore player position if in room scene
     if (data.playerState.currentScene === 'room' && this.roomScene) {

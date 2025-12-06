@@ -299,29 +299,63 @@ In preparation for F2 requirements, we've implemented a comprehensive 2D top-dow
 - Create additional interactive objects in rooms
 - Implement game ending conditions
 
+---
 
-#### Current State ### 
-### Current State
+# Devlog Entry - December 4, 2025
 
-The game now features:
-- ✅ Realistic physics with proper material interactions
-- ✅ Complete perimeter protection (ball can't fall off platform)
-- ✅ Improved camera view for better gameplay visibility
-- ✅ Refined ramp mechanics for better puzzle flow
-- ✅ 10-second timer with automatic restart and scene exit
-- ✅ Visual timer display with color-coded urgency feedback
-- ✅ Reliable CI/CD pipeline with automated testing
-- ✅ All F1 requirements fully satisfied
-- ✅ 2D top-down RoomScene with 9 interconnected rooms
-- ✅ A* pathfinding system for intelligent navigation**
-- ✅ Enhanced player character model with body and head**
-- ✅ Seamless scene transitions between 2D room view and 3D puzzle view**
-- ✅ Context-aware UI (instructions hidden in room scene)**
-- ✅ Corridor system connecting rooms with doorways**
-- ✅ Player spawns in non-puzzle room, requiring navigation to puzzle**
-- ✅ Implement object interaction system for F2 requirements
-- ✅ Add inventory system for carrying objects between scenes
-- ✅Create additional interactive objects in rooms
-- ✅Implement game ending conditions
+## F3 Requirements Implementation
+
+Today we completed implementation of multiple F3 requirements, bringing our game to a fully playable state that satisfies the F3 milestone.
+
+## Selected Requirements
+
+We selected the following F3 requirements to implement:
+
+1. **[unlimited undo]**: We chose this requirement because it represents an interesting technical challenge in state management and provides significant value to players. Implementing unlimited undo requires careful tracking of game state and designing a system that can reverse any major action without breaking game consistency. This requirement also aligns well with our existing scene management and inventory systems, making it a natural extension of our architecture.
+
+2. **[save system]**: We selected the save system requirement because it's essential for a complete game experience and was a logical next step after implementing our scene management and inventory systems. The requirement for multiple save slots and auto-save ensures players never lose progress, which is critical for a point-and-click adventure game where players may need to experiment with different approaches.
+
+3. **[visual themes]**: We chose visual themes because it enhances the game's polish and accessibility. Implementing light and dark modes that respond to system preferences demonstrates attention to user experience and allows players to play comfortably in different lighting conditions. The requirement to integrate themes deeply into the game (day/night lighting of rooms) also provides an opportunity to create a more immersive atmosphere.
+
+4. **[touchscreen]**: We selected touchscreen support because it significantly expands the game's accessibility and playability on mobile devices. Since our game is built as a web application, adding touchscreen-only gameplay ensures that players can enjoy the full experience on smartphones and tablets without requiring external peripherals. This requirement also complements our existing keyboard and mouse controls, making the game truly cross-platform.
+
+## How We Satisfied the Software Requirements
+
+### Unlimited Undo
+
+We implemented an unlimited undo system (`UndoSystem.ts`) that tracks and can reverse all major play actions. The system maintains an unlimited stack of actions, where each action stores complete state information needed for reversal. We identified three major action types: scene transitions (moving between RoomScene and PuzzleScene), object interactions (picking up items), and player movements (click-to-move navigation). Each action type has its own data structure that captures the necessary state: `SceneTransitionData` stores previous and new scene names plus player position, `ObjectInteractionData` stores object data and inventory state before the action, and `PlayerMovementData` stores from/to positions. The undo system integrates seamlessly with our existing systems: `SceneManager` automatically records scene transitions, `RoomScene` records object interactions and player movements, and the `Game` class provides a keyboard shortcut (Ctrl+Z / Cmd+Z) for undo with visual feedback. When undoing, the system restores complete state: scene transitions restore the previous scene and player position, object interactions restore objects to the scene and inventory to its previous state, and player movements restore the player's position. The system handles edge cases like preventing undo during game ending states, clearing undo history when loading saves, and properly recreating objects with all their original properties. This satisfies the requirement for unlimited levels of undo of major play actions, excluding physics interactions within the puzzle scene as specified.
+
+### Save System
+
+We implemented a comprehensive save system (`SaveSystem.ts`) that supports multiple save slots (three manual save slots) and an auto-save feature. The save system uses browser localStorage to persist game state, including inventory items, game progress, player position, current scene, and removed interactable objects. The auto-save feature automatically saves the game when significant events occur (inventory changes, scene transitions, puzzle completion), ensuring players never lose progress by accidentally closing the game. Manual save slots allow players to create named save points at different stages of the game. The save system integrates with our `GameStateManager` to capture and restore complete game state, including puzzle completion status, items collected, and player position in the room scene. When loading a save, the system restores all game state: inventory is repopulated, removed objects are tracked, the player is moved to the saved position, and the correct scene is loaded. The system also provides UI (`SaveLoadUI.ts`) for managing saves, showing save timestamps, and confirming save/load operations. This fully satisfies the requirement for multiple save points and auto-save functionality.
+
+### Visual Themes
+
+We implemented a visual theme system (`ThemeManager.ts`) that supports light and dark modes that automatically respond to the user's system preferences (detected via `prefers-color-scheme` media query). The theme system deeply integrates into the game's display: in light mode, rooms have bright, sunny lighting with lighter floor and wall colors, while dark mode features dim, moonlit lighting with darker room colors. The lighting system (ambient and directional lights) changes color and intensity based on the theme, creating a day/night atmosphere in the fictional rooms. The theme also affects UI elements through CSS variables, changing background colors, text colors, and accent colors. The system listens for system preference changes in real-time, automatically updating the game's visual style when the user changes their OS or browser theme preference. This satisfies the requirement for light and dark modes that respond to host environment preferences and are deeply integrated into the game's display, not just window borders.
+
+### Touchscreen Support
+
+We implemented comprehensive touchscreen support (`TouchController.ts` and touch event handlers in `RoomScene.ts`) that enables full gameplay without requiring mouse or keyboard input. In the `RoomScene`, we added touch event listeners (`touchstart`, `touchend`) that work alongside existing mouse click handlers, allowing players to tap anywhere on the screen to move their character or interact with objects. Touch events use the same interaction logic as mouse clicks, ensuring consistent behavior across input methods. For the `PuzzleScene`, we created a virtual joystick system that appears at the touch location when the player touches the screen. The joystick consists of a base circle and a movable stick that the player can drag to control the ball's direction. The stick movement is constrained to the joystick radius, and the force applied to the ball is proportional to the stick's position relative to the center. The joystick automatically hides when the touch ends, providing a clean interface. All touch events prevent default browser behavior (scrolling, zooming) to ensure smooth gameplay. The touch controller works simultaneously with keyboard controls, allowing players to use either input method seamlessly. This fully satisfies the requirement for touchscreen-only gameplay with no dependency on mouse or keyboard.
+
+## Reflection
+
+Looking back on how we achieved the F3 requirements, our team's approach evolved significantly from our initial planning. Initially, we focused primarily on the unlimited undo system as it seemed like the most technically interesting challenge. However, as we implemented it, we realized that the save system and visual themes were natural complements that would significantly improve the player experience. The save system, in particular, became more important than we initially anticipated because it works hand-in-hand with the undo system—players can save their progress and also undo actions, giving them multiple ways to recover from mistakes.
+
+Our implementation approach also changed as we worked. We initially planned to implement each requirement in isolation, but we discovered that these systems benefit greatly from integration. For example, the undo system needed to work with the save system to prevent cross-session undo issues, and the theme system needed to update both the 3D scene lighting and the 2D room scene simultaneously. This led us to create a more cohesive architecture where systems communicate through well-defined interfaces.
+
+One key learning was the importance of state management. Implementing unlimited undo required us to think carefully about what constitutes "game state" and how to capture it efficiently. We learned that not all state needs to be captured—only the state that changes as a result of player actions. This insight helped us design a lightweight undo system that doesn't impact performance.
+
+The visual themes requirement turned out to be more complex than expected because it required changes to both Three.js lighting systems and CSS styling. We learned the value of having a centralized theme manager that coordinates changes across multiple systems, which is a pattern we'll likely reuse in future features.
+
+The touchscreen requirement was the most recent addition and required us to think carefully about input abstraction. We realized that our existing input handling was tightly coupled to specific input devices, so we refactored the interaction system to use a unified coordinate-based approach. This allowed us to support both mouse clicks and touch taps with the same underlying logic. The virtual joystick for the puzzle scene was particularly interesting because it required creating a custom UI element that works seamlessly with the game's rendering system. We learned that touch input requires more careful event handling to prevent unwanted browser behaviors like scrolling and zooming.
+
+Overall, the F3 requirements pushed us to think more holistically about the game architecture and player experience, leading to a more polished and user-friendly game than we initially planned. The combination of undo, save system, visual themes, and touchscreen support creates a comprehensive, accessible game that works well across different devices and user preferences.
+
+---
+
+## Repository Link
+
+The complete project with all devlog entries can be found at:
+**https://github.com/rv-us/cmpm121-final.git**
 
 

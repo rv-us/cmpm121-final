@@ -4,6 +4,7 @@ import { SceneManager } from '../game/SceneManager.js';
 import { InteractableObject, InteractionType, InteractableObjectData } from '../objects/InteractableObject.js';
 import { Inventory } from '../systems/Inventory.js';
 import { ThemeManager } from '../systems/ThemeManager.js';
+import { UndoSystem } from '../systems/UndoSystem.js';
 
 interface Room {
   name: string;
@@ -39,6 +40,7 @@ export class RoomScene implements Scene {
   private sceneManager: SceneManager | null = null;
   private inventory: Inventory;
   private themeManager: ThemeManager;
+  private undoSystem: UndoSystem;
   
   // Lighting (will be updated based on theme)
   private ambientLight: THREE.AmbientLight | null = null;
@@ -65,12 +67,14 @@ export class RoomScene implements Scene {
     camera: THREE.PerspectiveCamera,
     renderer: THREE.WebGLRenderer,
     inventory: Inventory,
-    themeManager: ThemeManager
+    themeManager: ThemeManager,
+    undoSystem: UndoSystem
   ) {
     this.scene = scene;
     this.renderer = renderer;
     this.inventory = inventory;
     this.themeManager = themeManager;
+    this.undoSystem = undoSystem;
     
     // Create orthographic camera for 2D top-down view
     const aspect = window.innerWidth / window.innerHeight;
@@ -414,73 +418,170 @@ export class RoomScene implements Scene {
     this.currentRoom = this.rooms.find(r => r.x === -10 && r.z === -10) || null;
   }
 
-  private setupClickHandler(): void {
-    this.renderer.domElement.addEventListener('click', (event) => {
-      this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  private handleInteraction(clientX: number, clientY: number): void {
+    this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-      
-      // First check for interactable objects
-      const interactableMeshes = this.interactableObjects.map(obj => obj.mesh);
-      const objectIntersects = this.raycaster.intersectObjects(interactableMeshes);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    
+    // First check for interactable objects
+    const interactableMeshes = this.interactableObjects.map(obj => obj.mesh);
+    const objectIntersects = this.raycaster.intersectObjects(interactableMeshes);
 
-      if (objectIntersects.length > 0) {
-        const mesh = objectIntersects[0].object as THREE.Mesh;
-        const obj = mesh.userData.interactableObject as InteractableObject;
-        if (obj) {
-          const result = obj.interact();
-          this.showInteractionMessage(result.message);
+    if (objectIntersects.length > 0) {
+      const mesh = objectIntersects[0].object as THREE.Mesh;
+      const obj = mesh.userData.interactableObject as InteractableObject;
+      if (obj) {
+        const result = obj.interact();
+        this.showInteractionMessage(result.message);
+        
+        if (result.success) {
+          // Capture state before interaction for undo
+          const inventoryStateBefore = [...this.inventory.getAllItems()];
+          const objectData = { ...obj.data };
+          const objectPosition = {
+            x: obj.mesh.position.x,
+            y: obj.mesh.position.y,
+            z: obj.mesh.position.z,
+          };
+          const objectId = obj.data.id;
           
-          if (result.success) {
-            // Add to inventory
-            this.inventory.addItem({
-              id: obj.data.id,
-              name: obj.data.name,
-              description: obj.data.description,
-              color: obj.data.color,
-            });
-            
-            // Track removed object
-            this.removedObjectIds.add(obj.data.id);
-            
-            // Remove object from scene and list
-            this.scene.remove(obj.mesh);
-            const index = this.interactableObjects.indexOf(obj);
-            if (index > -1) {
-              this.interactableObjects.splice(index, 1);
+          // Add to inventory
+          this.inventory.addItem({
+            id: obj.data.id,
+            name: obj.data.name,
+            description: obj.data.description,
+            color: obj.data.color,
+          });
+          
+          // Track removed object
+          this.removedObjectIds.add(obj.data.id);
+          
+          // Remove object from scene and list
+          this.scene.remove(obj.mesh);
+          const index = this.interactableObjects.indexOf(obj);
+          if (index > -1) {
+            this.interactableObjects.splice(index, 1);
+          }
+          
+          // Record undo action
+          this.undoSystem.recordObjectInteraction(
+            objectId,
+            objectData,
+            inventoryStateBefore,
+            objectPosition,
+            () => {
+              // Undo callback: restore object and inventory
+              // Remove item from inventory
+              this.inventory.removeItem(objectId);
+              
+              // Restore inventory to previous state (in case other items were added)
+              this.inventory.clear();
+              inventoryStateBefore.forEach(item => {
+                this.inventory.addItem(item);
+              });
+              
+              // Recreate object
+              const restoredObject = new InteractableObject(objectData);
+              restoredObject.mesh.position.set(
+                objectPosition.x,
+                objectPosition.y,
+                objectPosition.z
+              );
+              this.scene.add(restoredObject.mesh);
+              this.interactableObjects.push(restoredObject);
+              
+              // Remove from removed objects set
+              this.removedObjectIds.delete(objectId);
             }
-            obj.dispose();
+          );
+          
+          obj.dispose();
+        }
+        return;
+      }
+    }
+
+    // Then check for room clicks (movement and puzzle)
+    const intersects = this.raycaster.intersectObjects(this.roomMeshes);
+
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+      
+      if (this.puzzleIndicator) {
+        const distance = point.distanceTo(this.puzzleIndicator.position);
+        if (distance < 1.5) {
+          if (this.onSceneExitCallback) {
+            this.onSceneExitCallback('puzzle');
           }
           return;
         }
       }
 
-      // Then check for room clicks (movement and puzzle)
-      const intersects = this.raycaster.intersectObjects(this.roomMeshes);
-
-      if (intersects.length > 0) {
-        const point = intersects[0].point;
-        
-        if (this.puzzleIndicator) {
-          const distance = point.distanceTo(this.puzzleIndicator.position);
-          if (distance < 1.5) {
-            if (this.onSceneExitCallback) {
-              this.onSceneExitCallback('puzzle');
+      if (this.player) {
+        const start = this.player.position;
+        const path = this.findPath(start, point);
+        if (path.length > 0) {
+          // Capture movement for undo
+          const fromPosition = {
+            x: start.x,
+            y: start.y,
+            z: start.z,
+          };
+          const toPosition = {
+            x: point.x,
+            y: point.y,
+            z: point.z,
+          };
+          
+          // Record undo action before setting path
+          this.undoSystem.recordPlayerMovement(
+            fromPosition,
+            toPosition,
+            () => {
+              // Undo callback: restore player position
+              if (this.player) {
+                this.player.position.set(fromPosition.x, fromPosition.y, fromPosition.z);
+                this.playerPath = []; // Clear current path
+              }
             }
-            return;
-          }
-        }
-
-        if (this.player) {
-          const start = this.player.position;
-          const path = this.findPath(start, point);
-          if (path.length > 0) {
-            this.playerPath = path;
-          }
+          );
+          
+          this.playerPath = path;
         }
       }
+    }
+  }
+
+  private setupClickHandler(): void {
+    // Mouse click handler
+    this.renderer.domElement.addEventListener('click', (event) => {
+      this.handleInteraction(event.clientX, event.clientY);
     });
+
+    // Touch handler for touchscreen support
+    let touchStartTime = 0;
+    this.renderer.domElement.addEventListener('touchstart', (event) => {
+      event.preventDefault(); // Prevent scrolling
+      touchStartTime = Date.now();
+      if (event.touches.length > 0) {
+        const touch = event.touches[0];
+        this.handleInteraction(touch.clientX, touch.clientY);
+      }
+    }, { passive: false });
+
+    // Also handle touch end for better responsiveness
+    this.renderer.domElement.addEventListener('touchend', (event) => {
+      event.preventDefault();
+      // Only handle if it was a quick tap (not a drag)
+      if (Date.now() - touchStartTime < 300 && event.changedTouches.length > 0) {
+        const touch = event.changedTouches[0];
+        // Small delay to distinguish from touchstart
+        setTimeout(() => {
+          // Already handled in touchstart, but this ensures responsiveness
+        }, 50);
+      }
+    }, { passive: false });
   }
 
   private findPath(start: THREE.Vector3, end: THREE.Vector3): THREE.Vector3[] {

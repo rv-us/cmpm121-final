@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { PhysicsWorld } from '../game/PhysicsWorld.js';
 import { PhysicsObject } from '../objects/PhysicsObject.js';
 import { KeyboardController } from '../objects/KeyboardController.js';
+import { TouchController } from '../objects/TouchController.js';
 import { Puzzle, PuzzleState } from '../game/Puzzle.js';
 import { GameUI } from '../ui/GameUI.js';
 import { Scene } from '../game/Scene.js';
@@ -16,6 +17,7 @@ export class PuzzleScene implements Scene {
   private physicsWorld: PhysicsWorld;
   private renderer: THREE.WebGLRenderer; // Will be set from Game class
   private keyboardController: KeyboardController | null = null;
+  private touchController: TouchController | null = null;
   private puzzle: Puzzle;
   private gameUI: GameUI;
   private objects: PhysicsObject[] = [];
@@ -307,6 +309,13 @@ export class PuzzleScene implements Scene {
     }
   }
 
+  public setTouchController(controller: TouchController): void {
+    this.touchController = controller;
+    if (this.ball) {
+      controller.setBall(this.ball);
+    }
+  }
+
   private setupPuzzleCallbacks(): void {
     this.puzzle.onSuccess(() => {
       this.gameUI.updateState(PuzzleState.Success);
@@ -359,6 +368,10 @@ export class PuzzleScene implements Scene {
     // Update keyboard controls
     if (this.keyboardController) {
       this.keyboardController.update();
+    }
+    // Update touch controls
+    if (this.touchController) {
+      this.touchController.update();
     }
 
     // Update physics
@@ -423,6 +436,16 @@ export class PuzzleScene implements Scene {
   
     if (this.sceneManager) {
       this.sceneManager.setCurrentCamera(this.camera);
+    }
+    
+    // Set ball reference for controllers
+    if (this.ball) {
+      if (this.keyboardController) {
+        this.keyboardController.setBall(this.ball);
+      }
+      if (this.touchController) {
+        this.touchController.setBall(this.ball);
+      }
     }
     
     // Show puzzle objects
